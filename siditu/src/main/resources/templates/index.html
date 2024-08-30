@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<title>SIDITU: Formulario de Turnos de Celadores</title>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+	<link th:href="@{/css/mystyle.css}" rel="stylesheet">
+	<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+	<style>
+		/* Asegurarse de que los checkboxes estén alineados con el texto */
+		.form-group .d-flex {
+			align-items: center;
+		}
+
+		/* Aumentar el espacio entre el checkbox y la etiqueta */
+		.form-check-input.me-2 {
+			margin-right: 0.5rem;
+		}
+
+		/* Opcional: ajustar el tamaño del checkbox */
+		.form-check-input {
+			transform: scale(1.2);
+			/* Aumenta el tamaño del checkbox para mayor visibilidad */
+		}
+	</style>
+</head>
+
+<body class="d-flex flex-column min-vh-100">
+	<div class="container my-4 flex-grow-1">
+		<h1 class="mb-4 text-center">SIDITU - Sistema de Distribución de Turnos</h1>
+
+		<!-- Modal de advertencia -->
+		<div class="modal fade" id="warningModal" tabindex="-1" aria-labelledby="warningModalLabel" aria-hidden="true">
+			<div class="modal-dialog">
+				<div class="modal-content">
+					<div class="modal-header bg-warning text-dark">
+						<h5 class="modal-title" id="warningModalLabel">Advertencia Importante</h5>
+						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					</div>
+					<div class="modal-body">
+						<p>Recuerda que solo puedes generar la distribución de turnos una vez por turno. Asegúrate de
+							reflejar la situación real del turno antes de enviar la generación de turnos.</p>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-primary" data-bs-dismiss="modal">Entendido</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="alert alert-info d-flex align-items-center"
+			style="background-color: #e3f2fd; border-left: 5px solid #2196f3;">
+			<div class="me-3">
+				<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#2196f3" class="bi bi-clock"
+					viewBox="0 0 16 16">
+					<path d="M8 3.5a.5.5 0 0 1 .5.5v4.25l2.5 1.5a.5.5 0 1 1-.5.866L7.5 8.857V4a.5.5 0 0 1 .5-.5z" />
+					<path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm0-1A7 7 0 1 1 8 1a7 7 0 0 1 0 14z" />
+				</svg>
+			</div>
+			<div>
+				<strong
+					th:text="'Es el turno de ' + (${turnoActual} == 'M' ? 'MAÑANA' : 'NOCHE') + ' del día ' + ${formattedDate}"></strong>
+			</div>
+		</div>
+
+
+		<!-- Mostrar mensaje y botón si ya se generó el turno -->
+		<div th:if="${turnoGenerado}">
+			<div class="alert alert-warning text-center">
+				La generación de turnos para este turno ya ha sido realizada.
+			</div>
+			<a th:href="@{/turnos}" class="btn btn-primary w-100 mt-3">Visualizar Turno Actual</a>
+		</div>
+
+		<!-- Mostrar el formulario solo si no se ha generado el turno -->
+		<div th:if="${turnoGenerado != null and !turnoGenerado}">
+			<form id="formTurnos" action="/generarTurnos" method="post" onsubmit="return validateForm()">
+				<div class="row mb-4">
+					<label for="numeroDePersonas" class="col-sm-2 col-form-label">Número de Personas:</label>
+					<div class="col-sm-1">
+						<input type="number" id="numeroDePersonas" name="numeroDePersonas" class="form-control" min="5"
+							max="8">
+					</div>
+				</div>
+
+				<div id="nombreCampos" class="col-sm-12">
+					<!-- Campos dinámicos para empleados se generarán aquí -->
+				</div>
+
+				<input type="hidden" name="turno" th:value="${turnoActual}">
+
+				<hr>
+				<div class="mb-3 form-check">
+					<input type="checkbox" id="subdividir" name="subdividir" value="true" class="form-check-input">
+					<label for="subdividir" class="form-check-label">Subdividir los turnos en mitades</label>
+				</div>
+
+				<div class="mb-3 form-check">
+					<input type="checkbox" id="aleatorio" name="aleatorio" value="true" class="form-check-input">
+					<label for="aleatorio" class="form-check-label">Generar Turnos Aleatoriamente</label>
+				</div>
+
+				<button type="submit" class="btn btn-primary">Generar Turnos</button>
+			</form>
+		</div>
+	</div>
+
+	<!-- Incluir el fragmento del footer -->
+	<div th:replace="~{fragments/footer :: footer}"></div>
+
+	<script>
+		document.getElementById('numeroDePersonas').addEventListener('input', function () {
+			if (!this.value || this.value < 5) {
+				this.value = 5;
+			}
+		});
+
+		document.getElementById('numeroDePersonas').addEventListener('change', function () {
+			const numeroDePersonas = parseInt(this.value);
+			const container = document.getElementById('nombreCampos');
+
+			// Almacenar los valores actuales de los campos de entrada
+			const existingValues = [];
+			const existingCheckboxes = [];
+			document.querySelectorAll('#nombreCampos .form-group').forEach((group, index) => {
+				const input = group.querySelector('input[type="text"]');
+				const checkbox = group.querySelector('input[type="checkbox"]');
+				if (input) {
+					existingValues.push(input.value);
+				}
+				if (checkbox) {
+					existingCheckboxes.push(checkbox.checked);
+				}
+			});
+
+			// Limpiar los campos anteriores
+			container.innerHTML = '';
+
+			for (let i = 0; i < numeroDePersonas; i++) {
+				const inputGroup = document.createElement('div');
+				inputGroup.className = 'form-group row mb-3';
+
+				const label = document.createElement('label');
+				label.className = 'col-sm-2 col-form-label';
+				label.textContent = 'Nombre ' + (i + 1) + ':';
+
+				const inputDiv = document.createElement('div');
+				inputDiv.className = 'col-sm-7';
+
+				const input = document.createElement('input');
+				input.type = 'text';
+				input.name = 'empleados[' + i + '].nombre';
+				input.required = true;
+				input.maxLength = 100;
+				input.pattern = "[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9 ]{1,100}";
+				input.className = 'form-control';
+				input.title = "El nombre debe contener solo letras (mayúsculas y minúsculas), números, espacios, y tener una longitud máxima de 100 caracteres.";
+				input.setAttribute("list", `empleadosList-${i}`);
+				input.id = `empleado-${i}`;
+
+				// Restaurar valor si existe
+				if (existingValues[i]) {
+					input.value = existingValues[i];
+				}
+
+				// Datalist para la autocompletación
+				const dataList = document.createElement('datalist');
+				dataList.id = `empleadosList-${i}`;
+				inputDiv.appendChild(input);
+				inputDiv.appendChild(dataList);
+
+				// Event listener for fetching employees as the user types
+				input.addEventListener('input', function () {
+					fetch('/buscarEmpleados?nombre=' + encodeURIComponent(input.value))
+						.then(response => response.json())
+						.then(data => {
+							dataList.innerHTML = ''; // Clear previous options
+							if (Array.isArray(data)) { // Check if the response is an array
+								data.forEach(empleado => {
+									const option = document.createElement('option');
+									option.value = empleado.nombre;
+									dataList.appendChild(option);
+								});
+							} else {
+								console.error('Expected an array but got:', data);
+							}
+						})
+						.catch(error => console.error('Error fetching employees:', error));
+				});
+
+				const checkboxDiv = document.createElement('div');
+				checkboxDiv.className = 'col-sm-3 form-check d-flex align-items-center';
+
+				const checkbox = document.createElement('input');
+				checkbox.type = 'checkbox';
+				checkbox.name = 'empleados[' + i + '].puedeIrAQuirofano';
+				checkbox.className = 'form-check-input me-2';
+
+				// Restaurar estado del checkbox si existe
+				if (existingCheckboxes[i] !== undefined) {
+					checkbox.checked = existingCheckboxes[i];
+				}
+
+				const checkboxLabel = document.createElement('label');
+				checkboxLabel.className = 'form-check-label';
+				checkboxLabel.textContent = 'Asignar a Q';
+
+				checkboxDiv.appendChild(checkbox);
+				checkboxDiv.appendChild(checkboxLabel);
+
+				inputGroup.appendChild(label);
+				inputGroup.appendChild(inputDiv);
+				inputGroup.appendChild(checkboxDiv);
+
+				container.appendChild(inputGroup);
+			}
+		});
+
+
+		function validateForm() {
+			const numeroDePersonas = document.getElementById('numeroDePersonas').value;
+			const checkboxes = document.querySelectorAll('#nombreCampos input[type="checkbox"]:checked');
+			const inputs = document.querySelectorAll('#nombreCampos input[type="text"]');
+			const nombres = new Set();
+
+			// Verificar que haya al menos 5 empleados
+			if (numeroDePersonas < 5) {
+				Swal.fire({
+					icon: 'error',
+					title: 'Error',
+					text: 'Debe haber al menos 5 empleados para distribuir el turno.',
+				});
+				return false;
+			}
+
+			// Verificar que todos los nombres estén llenos, válidos y no duplicados
+			for (let input of inputs) {
+				const nombre = input.value.trim();
+				if (nombre === '') {
+					Swal.fire({
+						icon: 'error',
+						title: 'Error',
+						text: 'Por favor, completa todos los campos de nombre.',
+					});
+					return false;
+				}
+				if (!input.checkValidity()) {
+					Swal.fire({
+						icon: 'error',
+						title: 'Error',
+						text: input.title,
+					});
+					return false;
+				}
+				if (nombres.has(nombre)) {
+					Swal.fire({
+						icon: 'error',
+						title: 'Error',
+						text: `El nombre "${nombre}" está duplicado.`,
+					});
+					return false;
+				}
+				nombres.add(nombre);
+			}
+
+			// Verificar que al menos un empleado pueda ir a quirófano
+			if (checkboxes.length === 0) {
+				Swal.fire({
+					icon: 'error',
+					title: 'Error',
+					text: 'Debe seleccionar al menos un empleado que pueda ir a quirófano.',
+				});
+				return false;
+			}
+
+			return true;
+		}
+
+
+		// Mostrar el modal cuando la página se carga
+		window.addEventListener('load', function () {
+			var warningModal = new bootstrap.Modal(document.getElementById('warningModal'));
+			warningModal.show();
+		});
+	</script>
+
+
+	<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"
+		integrity="sha384-IQsoLXl5PILFhosVNubq5LC7Qb9DXgDA9i+tQ8Zj3iwWAwPtgFTxbJ8NT4GN1R8p"
+		crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.min.js"
+		integrity="sha384-cVKIPhGWiC2Al4u+LWgxfKTRIcfu0JTxR+EQDz/bgldoEyl4H0zUF0QKbrJ0EcQF"
+		crossorigin="anonymous"></script>
+</body>
+
+</html>
