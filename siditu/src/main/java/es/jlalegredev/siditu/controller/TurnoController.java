@@ -61,16 +61,14 @@ public class TurnoController {
 		ZoneId zoneId = ZoneId.of("Europe/Madrid");
 		ZonedDateTime now = ZonedDateTime.now(zoneId);
 
-		// Ajuste de fecha para turnos de noche (entre medianoche y las 8 AM)
-		if (now.toLocalTime().isBefore(LocalTime.of(8, 0))) {
-			now = now.minusDays(1);
-		}
-
 		// Determinar el turno actual basado en la hora
 		char turnoActual = now.getHour() < 8 || now.getHour() >= 20 ? 'N' : 'M';
 
-		// Obtener la fecha ajustada
+		// Ajustar la fecha para turnos de noche (entre 20:00 y las 8:00)
 		LocalDate today = now.toLocalDate();
+		if (turnoActual == 'N' && now.getHour() < 8) {
+			today = today.minusDays(1);
+		}
 
 		// Obtener los turnos del día y turno actual
 		List<Turno> turnos = turnoService.obtenerTurnosDelDia(today, turnoActual);
@@ -100,10 +98,15 @@ public class TurnoController {
 		ZonedDateTime now = ZonedDateTime.now(zoneId);
 		LocalDate today = now.toLocalDate();
 		LocalTime time = now.toLocalTime();
+
+		// Determinar el turno actual
 		char turnoActual = time.isBefore(LocalTime.of(8, 0)) ? 'N' : time.isBefore(LocalTime.of(20, 0)) ? 'M' : 'N';
 
+		// Ajustar la fecha para turnos de noche (entre 20:00 y las 8:00)
 		if (turnoActual == 'N' && time.isAfter(LocalTime.of(20, 0))) {
-			today = today.minusDays(1);
+			today = now.toLocalDate(); // Ya es después de las 20:00, usar la fecha actual
+		} else if (turnoActual == 'N' && time.isBefore(LocalTime.of(8, 0))) {
+			today = today.minusDays(1); // Es después de la medianoche pero antes de las 8:00, usar la fecha anterior
 		}
 
 		if (!turnoService.obtenerTurnosDelDia(today, turnoActual).isEmpty()) {

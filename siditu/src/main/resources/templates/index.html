@@ -111,15 +111,26 @@
 	<div th:replace="~{fragments/footer :: footer}"></div>
 
 	<script>
+		// Limitar el valor del input entre 5 y 8 al momento de la entrada
 		document.getElementById('numeroDePersonas').addEventListener('input', function () {
 			if (!this.value || this.value < 5) {
 				this.value = 5;
+			} else if (this.value > 8) {
+				this.value = 8;
 			}
 		});
 
+		// Actualizar el número de campos cuando cambia el valor del input
 		document.getElementById('numeroDePersonas').addEventListener('change', function () {
-			const numeroDePersonas = parseInt(this.value);
+			let numeroDePersonas = parseInt(this.value);
 			const container = document.getElementById('nombreCampos');
+
+			// Asegurarse de que el valor esté entre 5 y 8
+			if (numeroDePersonas < 5) {
+				numeroDePersonas = 5;
+			} else if (numeroDePersonas > 8) {
+				numeroDePersonas = 8;
+			}
 
 			// Almacenar los valores actuales de los campos de entrada
 			const existingValues = [];
@@ -218,7 +229,6 @@
 			}
 		});
 
-
 		function validateForm() {
 			const numeroDePersonas = document.getElementById('numeroDePersonas').value;
 			const checkboxes = document.querySelectorAll('#nombreCampos input[type="checkbox"]:checked');
@@ -278,13 +288,13 @@
 			return true;
 		}
 
-
 		// Mostrar el modal cuando la página se carga
 		window.addEventListener('load', function () {
 			var warningModal = new bootstrap.Modal(document.getElementById('warningModal'));
 			warningModal.show();
 		});
 	</script>
+
 
 
 	<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"
