@@ -73,8 +73,8 @@ public class TurnoController {
 		// Obtener los turnos del día y turno actual
 		List<Turno> turnos = turnoService.obtenerTurnosDelDia(today, turnoActual);
 		if (turnos.isEmpty()) {
-			model.addAttribute("mensaje", "No se ha generado un turno aún.");
-			return "index";
+			model.addAttribute("mensajeError", "No se ha generado un turno aún.");
+			return "error";
 		}
 
 		// Buscar el empleado que puede ir a quirófano
