@@ -39,6 +39,10 @@ public class EmpleadoService {
     public List<Empleado> obtenerTodosLosEmpleados() {
         return empleadoRepository.findAll();
     }
+    
+    public List<Empleado> obtenerEmpleadosOrdenadosPorGrupoYNombre() {
+     return empleadoRepository.findAllOrderByEquipoAscNombreAsc();
+ }
 
     public List<Empleado> obtenerEmpleadosQuePuedenIrAQuirofano() {
         return empleadoRepository.findByPuedeIrAQuirofanoTrue();

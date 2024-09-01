@@ -23,18 +23,30 @@
 
 package es.jlalegredev.siditu.repository;
 
-import es.jlalegredev.siditu.model.Turno;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import es.jlalegredev.siditu.model.Turno;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 
 @Repository
 public interface TurnoRepository extends JpaRepository<Turno, Long> {
 
+	Optional<Turno> findById(Long id);
+
 	// Obtener todos los turnos de un día específico y turno (Mañana o Noche)
-	List<Turno> findByFechaAndTurno(LocalDate fecha, char turno);
+	// List<Turno> findByFechaAndTurno(LocalDate fecha, char turno);
 
 	// Obtener todos los turnos de un empleado específico
 	List<Turno> findByEmpleadoId(Long empleadoId);
@@ -42,6 +54,18 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
 	// Obtener todos los turnos en un intervalo específico
 	List<Turno> findByIntervalo(int intervalo);
 
-	// Eliminar todos los turnos de un día específico y turno
-	void deleteByFechaAndTurno(LocalDate fecha, char turno);
+	@Modifying
+	@Transactional
+	@Query("DELETE FROM Turno t WHERE t.fecha = :fecha AND t.turno = :turno")
+	void deleteTurnos(@Param("fecha") LocalDate fecha, @Param("turno") char turno);
+
+	@Modifying
+	@Transactional
+	@Query("DELETE FROM Turno t WHERE t.fecha = :fecha AND t.turno = :turno")
+	void deleteByFechaAndTurno(@Param("fecha") LocalDate fecha, @Param("turno") char turno);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("SELECT t FROM Turno t WHERE t.fecha = :fecha AND t.turno = :turno")
+	@QueryHints({ @QueryHint(name = "jakarta.persistence.lock.timeout", value = "10000") })
+	List<Turno> findByFechaAndTurno(@Param("fecha") LocalDate fecha, @Param("turno") char turno);
 }

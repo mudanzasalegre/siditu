@@ -43,8 +43,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import es.jlalegredev.siditu.model.Empleado;
+import es.jlalegredev.siditu.model.Puntuacion;
 import es.jlalegredev.siditu.model.Turno;
 import es.jlalegredev.siditu.service.EmpleadoService;
+import es.jlalegredev.siditu.service.PuntuacionService;
 import es.jlalegredev.siditu.service.TurnoService;
 
 @Controller
@@ -55,6 +57,9 @@ public class TurnoController {
 
 	@Autowired
 	private EmpleadoService empleadoService;
+
+	@Autowired
+	private PuntuacionService puntuacionService;
 
 	@GetMapping("/turnos")
 	public String mostrarTurnos(Model model) {
@@ -77,9 +82,15 @@ public class TurnoController {
 			return "error";
 		}
 
-		// Buscar el empleado que puede ir a quirófano
-		Empleado empleadoQuirofano = turnos.stream().filter(turno -> turno.getEmpleado().isPuedeIrAQuirofano()).findFirst()
-				.map(Turno::getEmpleado).orElse(null);
+		// Obtener los empleados ordenados por grupo y nombre
+		List<Empleado> empleadosOrdenados = empleadoService.obtenerEmpleadosOrdenadosPorGrupoYNombre();
+
+		// Pasar los empleados ordenados al modelo
+		model.addAttribute("empleadosOrdenados", empleadosOrdenados);
+
+		// Buscar el empleado que está marcado para quirófano en el turno actual
+		Empleado empleadoQuirofano = turnos.stream().filter(turno -> turno.isQuirofano()) // Filtrar por el campo quirófano
+				.map(Turno::getEmpleado).findFirst().orElse(null);
 
 		// Agregar los datos al modelo para la vista
 		model.addAttribute("turnos", turnos);
@@ -94,73 +105,108 @@ public class TurnoController {
 			@RequestParam(defaultValue = "false") boolean subdividir, @RequestParam(defaultValue = "false") boolean aleatorio,
 			@RequestParam Map<String, String> empleados, Model model) {
 
-		ZoneId zoneId = ZoneId.of("Europe/Madrid");
-		ZonedDateTime now = ZonedDateTime.now(zoneId);
-		LocalDate today = now.toLocalDate();
-		LocalTime time = now.toLocalTime();
+		try {
+			ZoneId zoneId = ZoneId.of("Europe/Madrid");
+			ZonedDateTime now = ZonedDateTime.now(zoneId);
+			LocalDate today = now.toLocalDate();
+			LocalTime time = now.toLocalTime();
 
-		// Determinar el turno actual
-		char turnoActual = time.isBefore(LocalTime.of(8, 0)) ? 'N' : time.isBefore(LocalTime.of(20, 0)) ? 'M' : 'N';
+			// Determinar el turno actual
+			char turnoActual = time.isBefore(LocalTime.of(8, 0)) ? 'N' : time.isBefore(LocalTime.of(20, 0)) ? 'M' : 'N';
 
-		// Ajustar la fecha para turnos de noche (entre 20:00 y las 8:00)
-		if (turnoActual == 'N' && time.isAfter(LocalTime.of(20, 0))) {
-			today = now.toLocalDate(); // Ya es después de las 20:00, usar la fecha actual
-		} else if (turnoActual == 'N' && time.isBefore(LocalTime.of(8, 0))) {
-			today = today.minusDays(1); // Es después de la medianoche pero antes de las 8:00, usar la fecha anterior
-		}
+			// Ajustar la fecha para turnos de noche
+			if (turnoActual == 'N' && time.isAfter(LocalTime.of(20, 0))) {
+				today = now.toLocalDate();
+			} else if (turnoActual == 'N' && time.isBefore(LocalTime.of(8, 0))) {
+				today = today.minusDays(1);
+			}
 
-		if (!turnoService.obtenerTurnosDelDia(today, turnoActual).isEmpty()) {
-			model.addAttribute("mensaje", "ERROR: Ya se ha generado un turno para este intervalo.");
-			return "index";
-		}
-
-		Set<String> uniqueNombres = new HashSet<>();
-		List<Empleado> empleadosTurno = new ArrayList<>();
-
-		for (int i = 0; i < numeroDePersonas; i++) {
-			String nombre = empleados.get("empleados[" + i + "].nombre").trim();
-			boolean puedeIrAQuirofano = empleados.containsKey("empleados[" + i + "].puedeIrAQuirofano");
-
-			if (uniqueNombres.contains(nombre)) {
-				model.addAttribute("mensaje", "ERROR: El empleado " + nombre + " está duplicado.");
+			// Verifica si ya se ha generado el turno
+			if (!turnoService.obtenerTurnosDelDia(today, turnoActual).isEmpty()) {
+				model.addAttribute("mensaje", "ERROR: Ya se ha generado un turno para este intervalo.");
 				return "index";
 			}
 
-			uniqueNombres.add(nombre);
+			Set<String> uniqueNombres = new HashSet<>();
+			List<Empleado> empleadosTurno = new ArrayList<>();
 
-			List<Empleado> encontrados = empleadoService.buscarEmpleadosPorNombre(nombre);
-			Empleado empleado;
+			for (int i = 0; i < numeroDePersonas; i++) {
+				String nombre = empleados.get("empleados[" + i + "].nombre").trim();
+				boolean puedeIrAQuirofano = empleados.containsKey("empleados[" + i + "].puedeIrAQuirofano");
 
-			if (encontrados.isEmpty()) {
-				empleado = new Empleado(nombre, puedeIrAQuirofano);
-				empleadoService.guardarEmpleado(empleado);
-			} else {
-				empleado = encontrados.get(0);
-				empleado.setPuedeIrAQuirofano(puedeIrAQuirofano);
-				empleadoService.guardarEmpleado(empleado);
+				if (uniqueNombres.contains(nombre)) {
+					model.addAttribute("mensaje", "ERROR: El empleado " + nombre + " está duplicado.");
+					return "index";
+				}
+
+				uniqueNombres.add(nombre);
+
+				List<Empleado> encontrados = empleadoService.buscarEmpleadosPorNombre(nombre);
+				Empleado empleado;
+
+				if (encontrados.isEmpty()) {
+					empleado = new Empleado(nombre, puedeIrAQuirofano, null);
+					empleadoService.guardarEmpleado(empleado);
+				} else {
+					empleado = encontrados.get(0);
+					empleado.setPuedeIrAQuirofano(puedeIrAQuirofano);
+					empleadoService.guardarEmpleado(empleado);
+				}
+
+				empleadosTurno.add(empleado);
 			}
 
-			empleadosTurno.add(empleado);
+			// Orden aleatorio si se seleccionó la opción
+			if (aleatorio) {
+				Collections.shuffle(empleadosTurno);
+			}
+
+			// Seleccionar un empleado para quirófano
+			Empleado empleadoQuirofano = seleccionarEmpleadoQuirofano(empleadosTurno);
+
+			// Generar asignaciones de turno
+// Generar asignaciones de turno
+			List<Turno> turnos = generarAsignacionesDeTurno(empleadosTurno, today, turnoActual, subdividir, empleadoQuirofano);
+
+			// Guardar turnos en la base de datos
+			turnoService.guardarTurnos(turnos);
+
+			// Para evitar puntos duplicados, utilizamos un Set para los IDs de los
+			// empleados ya puntuados
+			Set<Long> empleadosPuntuados = new HashSet<>();
+
+			// Generar y guardar las puntuaciones
+			for (Turno turno : turnos) {
+				Long empleadoId = turno.getEmpleado().getId();
+
+				// Verificamos si ya se ha puntuado al empleado en este turno
+				if (!empleadosPuntuados.contains(empleadoId)) {
+					// Puntuación por preselección
+					if (turno.getEmpleado().isPuedeIrAQuirofano()) {
+						Puntuacion preseleccion = new Puntuacion(turno, "preseleccion");
+						puntuacionService.guardarPuntuacion(preseleccion);
+					}
+
+					// Puntuación adicional si fue elegido para quirófano
+					if (turno.getEmpleado().equals(empleadoQuirofano)) {
+						Puntuacion elegido = new Puntuacion(turno, "elegido");
+						puntuacionService.guardarPuntuacion(elegido);
+					}
+
+					// Marcar este empleado como ya puntuado para evitar duplicados
+					empleadosPuntuados.add(empleadoId);
+				}
+			}
+
+			// Pasar los datos al modelo para su visualización
+			model.addAttribute("turnos", turnos);
+			model.addAttribute("empleadoQuirofano", empleadoQuirofano);
+			model.addAttribute("turno", turnoActual == 'M' ? "Mañana" : "Noche");
+		} catch (RuntimeException e) {
+			model.addAttribute("mensajeError",
+					"ERROR: No se pudo generar el turno debido a un conflicto de concurrencia. Por favor, intente nuevamente más tarde.");
+			return "error";
 		}
-
-		// Aplicar el orden aleatorio si se seleccionó la opción
-		if (aleatorio) {
-			Collections.shuffle(empleadosTurno);
-		}
-
-		// Asignar un empleado a quirófano de manera aleatoria entre los que pueden
-		Empleado empleadoQuirofano = seleccionarEmpleadoQuirofano(empleadosTurno);
-
-		// Generar los turnos según la configuración
-		List<Turno> turnos = generarAsignacionesDeTurno(empleadosTurno, today, turnoActual, subdividir);
-
-		// Guardar los turnos en la base de datos
-		turnoService.guardarTurnos(turnos);
-
-		// Pasar los datos al modelo para su visualización
-		model.addAttribute("turnos", turnos);
-		model.addAttribute("empleadoQuirofano", empleadoQuirofano);
-		model.addAttribute("turno", turnoActual == 'M' ? "Mañana" : "Noche");
 
 		return "turnos";
 	}
@@ -182,7 +228,7 @@ public class TurnoController {
 	}
 
 	private List<Turno> generarAsignacionesDeTurno(List<Empleado> empleadosTurno, LocalDate today, char turnoActual,
-			boolean subdividir) {
+			boolean subdividir, Empleado empleadoQuirofano) {
 
 		int numeroDePersonas = empleadosTurno.size();
 		int intervalo = subdividir ? 2 : 1;
@@ -198,14 +244,17 @@ public class TurnoController {
 			for (Empleado empleado : empleadosTurno) {
 				LocalTime slotEndTime = slotStartTime.plusMinutes(minutosPorPersona);
 
+				boolean esQuirofano = empleado.equals(empleadoQuirofano);
+
 				Turno turno = new Turno();
 				turno.setEmpleado(empleado);
 				turno.setFecha(today);
 				turno.setTurno(turnoActual);
 				turno.setIntervalo(intervalo);
-				turno.setEquipo(rep + 1); // Asignar equipo basado en el ciclo actual
+				turno.setRueda(rep + 1); // Asignar equipo basado en el ciclo actual
 				turno.setHoraInicio(slotStartTime);
 				turno.setHoraFin(slotEndTime);
+				turno.setQuirofano(esQuirofano);
 
 				turnos.add(turno);
 				slotStartTime = slotEndTime;
@@ -214,4 +263,5 @@ public class TurnoController {
 
 		return turnos;
 	}
+
 }

@@ -182,16 +182,51 @@
 				inputDiv.appendChild(input);
 				inputDiv.appendChild(dataList);
 
-				// Event listener for fetching employees as the user types
+				// Fetch sorted employees and populate the datalist
 				input.addEventListener('input', function () {
+					const inputValue = input.value.trim();
+					let groupFilter = null;
+
+					// Detect if the input is a number between 1 and 6
+					if (/^[1-6]$/.test(inputValue)) {
+						groupFilter = parseInt(inputValue, 10);
+					}
+
 					fetch('/buscarEmpleados?nombre=' + encodeURIComponent(input.value))
 						.then(response => response.json())
 						.then(data => {
 							dataList.innerHTML = ''; // Clear previous options
 							if (Array.isArray(data)) { // Check if the response is an array
+								// Filter and group employees
+								const employeesWithGroup = [];
+								const employeesWithoutGroup = [];
+
 								data.forEach(empleado => {
+									if (groupFilter === null || empleado.equipo === groupFilter) {
+										if (empleado.equipo) {
+											employeesWithGroup.push(empleado);
+										} else {
+											employeesWithoutGroup.push(empleado);
+										}
+									}
+								});
+
+								// Sort employees with a group by group number and then by name
+								employeesWithGroup.sort((a, b) => a.equipo - b.equipo || a.nombre.localeCompare(b.nombre));
+
+								// Append sorted employees with a group to the datalist
+								employeesWithGroup.forEach(empleado => {
+									const option = document.createElement('option');
+									option.value = `${empleado.nombre}`; // Only show the name in the input field
+									option.text = `Grupo ${empleado.equipo}: ${empleado.nombre}`;
+									dataList.appendChild(option);
+								});
+
+								// Append employees without a group
+								employeesWithoutGroup.forEach(empleado => {
 									const option = document.createElement('option');
 									option.value = empleado.nombre;
+									option.text = `Sin Grupo: ${empleado.nombre}`;
 									dataList.appendChild(option);
 								});
 							} else {
@@ -294,6 +329,8 @@
 			warningModal.show();
 		});
 	</script>
+
+
 
 
 

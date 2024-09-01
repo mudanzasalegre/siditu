@@ -48,7 +48,7 @@
                 </thead>
                 <tbody>
                     <tr th:each="turno : ${turnos}">
-                        <td th:text="${turno.equipo}"></td>
+                        <td th:text="${turno.rueda}"></td>
                         <td th:text="${turno.empleado.nombre}"></td>
                         <td th:text="${#temporals.format(turno.horaInicio, 'HH:mm')} + ' a ' + ${#temporals.format(turno.horaFin, 'HH:mm')}"></td>
                     </tr>

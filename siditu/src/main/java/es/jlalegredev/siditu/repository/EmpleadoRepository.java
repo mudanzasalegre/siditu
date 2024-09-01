@@ -23,21 +23,26 @@
 
 package es.jlalegredev.siditu.repository;
 
-import es.jlalegredev.siditu.model.Empleado;
+import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
+import es.jlalegredev.siditu.model.Empleado;
 
 @Repository
 public interface EmpleadoRepository extends JpaRepository<Empleado, Long> {
 
-    // Obtener todos los empleados que pueden ir a quirófano
-    List<Empleado> findByPuedeIrAQuirofanoTrue();
+	// Obtener todos los empleados que pueden ir a quirófano
+	List<Empleado> findByPuedeIrAQuirofanoTrue();
 
-    // Obtener todos los empleados que no pueden ir a quirófano
-    List<Empleado> findByPuedeIrAQuirofanoFalse();
+	// Obtener todos los empleados que no pueden ir a quirófano
+	List<Empleado> findByPuedeIrAQuirofanoFalse();
 
-    // Buscar empleados por nombre (parcial o completo)
-    List<Empleado> findByNombreContaining(String nombre);
+	// Buscar empleados por nombre (parcial o completo)
+	List<Empleado> findByNombreContaining(String nombre);
+
+	@Query("SELECT e FROM Empleado e ORDER BY e.equipo ASC NULLS LAST, e.nombre ASC")
+	List<Empleado> findAllOrderByEquipoAscNombreAsc();
 }
